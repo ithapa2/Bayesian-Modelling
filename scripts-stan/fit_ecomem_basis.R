@@ -1,4 +1,4 @@
-library("splines")
+library("mgcv")
 library("rstan")
 
 #######################################################################################
@@ -34,15 +34,15 @@ X2 = X2[!idx.na,]
 d.raw = d.raw[!idx.na,]
 fire = fire.raw[!idx.na,]
 
-d = matrix(NA, nrow=nrow(d.raw), ncol=ncol(d.raw))
-d[d.raw<(-6.119)] = 1
-d[d.raw>= (-6.119)] = 0
-# 
+# d = matrix(NA, nrow=nrow(d.raw), ncol=ncol(d.raw))
+# d[d.raw<(-6.119)] = 1
+# d[d.raw>= (-6.119)] = 0
+#
 # d.raw.hi = max(d.raw)
 # d.raw.lo = min(d.raw)
 # d = apply(d.raw, 2, function(x){(x-d.raw.lo)/(d.raw.hi -d.raw.lo)})
 
-#d = d.raw
+d = d.raw
 
 Y = t(Y)
 
@@ -52,15 +52,74 @@ N_sites = nrow(Y)
 X1 = t(X1)
 X2 = t(X2)
 
-X = array(NA, c(N_sites, N_years, 2))
+N_covars = 1
+
+X = array(NA, c(N_sites, N_years, N_covars))
+
 X[,,1] = X1
-X[,,2] = X2
+#X[,,2] = X2
 
 d = t(d)
 
 lag = 6
-N_covars = 2
 
+#######################################################################################
+## splines
+#######################################################################################
+
+# library(splines)
+# set.seed(1234)
+# num_knots <- lag # true number of knots
+# spline_degree <- 3
+# num_basis <- num_knots + spline_degree - 1
+# knots <- seq(from=0, to=lag, by=1)
+# B <- t(bs(knots, knots=knots, df=num_basis, degree=spline_degree, intercept = TRUE))
+# num_data = length(X.basis)
+
+
+t.s = (0:lag)/lag
+time = data.frame(t=0:lag,t.s=t.s)
+n.knots = lag + 1
+foo = mgcv::s(t.s,k=n.knots,bs="cr")
+
+CRbasis = mgcv::smoothCon(foo,
+                          data=time,
+                          knots=NULL,
+                          absorb.cons=TRUE,
+                          scale.penalty=TRUE)
+
+RE = diag(ncol(CRbasis[[1]]$S[[1]]))
+B = CRbasis[[1]]$X
+S = CRbasis[[1]]$S[[1]] +(1E-07)*RE
+S_inv = solve(S)
+
+n_basis = ncol(B)
+n_knots = nrow(B)
+
+
+# L = lag
+# ### Memory function inputs ###
+# # Define basis functions
+# bf = list()
+# for (j in 1:length(L)){
+#   t.s = (0:L[j])/L[j]
+#   time = data.frame(t=0:L[j],t.s=t.s)
+#   n.knots = L[j] + 1
+#   CRbasis = mgcv::smoothCon(mgcv::s(t.s,k=n.knots,bs="cr"),data=time,knots=NULL,absorb.cons=TRUE,
+#                             scale.penalty=TRUE)
+#   RE = diag(ncol(CRbasis[[1]]$S[[1]]))
+#   bf[[j]] = list(S=CRbasis[[1]]$S[[1]]+(1E-07)*RE,
+#                  H=CRbasis[[1]]$X,
+#                  k=ncol(CRbasis[[1]]$X),
+#                  U=chol(CRbasis[[1]]$S[[1]]+(1E-07)*RE))
+# }
+# 
+# B = bf[[1]]$H
+# 
+# num.basis = 
+# num.data = 
+# uni.wts = rep(1/(inputs$L[j]+1),inputs$L[j]+1)
+# eta = rnorm(inputs$bf[[j]]$k,coef(lm(uni.wts~inputs$bf[[j]]$H-1)),0.1)
 #######################################################################################
 ## data list
 #######################################################################################
@@ -70,70 +129,30 @@ dat = list(N_years = N_years,
            lag = lag,
            N_covars = N_covars,
            Y = Y,
-           X = X1,
+           X = X,
            d = d,
-           fire = fire)
+           fire = fire,
+           B = B,
+           S_inv = S_inv,
+           n_basis = n_basis,
+           n_knots = n_knots)
 
 #######################################################################################
 ## sampling
 #######################################################################################
 
+N_iter = 1000
+
 #rstan_options(auto_write = TRUE)
 #options(mc.cores = parallel::detectCores())
 
-sm<-stan_model("scripts/ecomem.stan")
+sm<-stan_model("scripts-stan/ecomem_basis.stan")
 
 fit<-sampling(sm,
               data=dat,
-              iter=1000,
+              iter=N_iter,
               chains = 1, 
               cores = 1)#,control = list(adapt_delta=0.95))
 
+saveRDS(fit, 'scripts-stan/output/fit_ecomem_basis.RDS')
 
-#######################################################################################
-## output
-#######################################################################################
-
-spherical <- function(x, phi) {
-  
-  # if (x <= 0) {
-  #   reject("x negative spherical function undefined; found x = ", x)
-  # }
-  if (x > phi) { g=0 } else {
-    g = (1 - 3.0/2.0 * x/phi + 1.0/2.0 * (x/phi)^3) 
-  }
-  
-  return(g)
-}
-
-
-plot(fit)
-
-names(fit)
-post = extract(fit)
-
-phi = 1/post$tau
-phi.mean = mean(phi)
-
-x = seq(1e-6, lag+2, by=0.001)
-mem = unlist(lapply(x, function(x){spherical(x, phi.mean)}))
-
-plot(x, mem, xlab="Year", ylab="Antecedent weight")
-
-phi_fire = 1/post$tau_fire
-phi_fire.mean = mean(phi_fire)
-
-x = seq(1e-6, lag+2, by=0.001)
-mem.fire = unlist(lapply(x, function(x){spherical(x, phi_fire.mean)}))
-
-plot(x, mem.fire, xlab="Year", ylab="Antecedent weight")
-
-
-gamma = cbind(post$gamma0, post$gamma1, post$gamma2)
-#quantile(gamma1, c(0.10, 0.5, 0.90))
-gamma.quants = apply(gamma, 2, quantile, c(0.05, 0.5, 0.95))
-gamma.quants
-
-beta = post$beta
-beta.quants = apply(beta, 2, quantile, c(0.05, 0.5, 0.95))
-beta.quants

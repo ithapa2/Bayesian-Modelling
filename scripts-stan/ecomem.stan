@@ -7,7 +7,7 @@ functions {
     }
     else if (x > phi) g=0;
     else {
-        g = (1 - 3.0/2.0 * x/phi + 1.0/2.0 * (x/phi)^3); 
+      g = (1 - 3.0/2.0 * x/phi + 1.0/2.0 * (x/phi)^3); 
     }
     
     return g;
@@ -29,7 +29,7 @@ parameters {
   real<lower=1e-6> sigma;
   //vector<lower=1e-6>[N_sites] sigma;
   real<lower=1e-6> sigma_alpha;
-  vector[N_sites] u;
+  vector[N_years] u[N_sites];
   
   real beta;
   
@@ -46,14 +46,29 @@ transformed parameters {
   
   phi = 1/tau;
   
+  // for (site in 1:N_sites) {
+  //   z[site] = rep_vector(0, N_years);
+  //   for (year in (lag+1):N_years) {
+  //     //for (l in 1:lag){
+  //     //  z[site][year] = z[site][year] + d[site][year-l] * spherical(year-l, phi); 
+  //     //}
+  //   }
+  //   
+  // }
+  
   for (site in 1:N_sites) {
     z[site] = rep_vector(0, N_years);
-    for (year in (lag+1):N_years) {
-      for (l in 1:lag){
-          z[site][year] = z[site][year] + d[site][year-l] * spherical(year-l, phi); 
+    for (year in 1:N_years) {
+      for (prior_year in 1:(year-1)){
+        if (d[site][year] == 1){
+          z[site][year] = z[site][year] + spherical(year-prior_year, phi);
+        }
       }
+      //for (l in 1:lag){
+      //  z[site][year] = z[site][year] + d[site][year-l] * spherical(year-l, phi);
+      //}
     }
-    
+
   }
   
   for (site in 1:N_sites) {
@@ -73,10 +88,12 @@ model {
   gamma_0 ~ normal(0, 1e5);
   gamma_1 ~ normal(0, 1e5);
   
-  u ~ normal(0, sigma_alpha);
-
   for (site in 1:N_sites){
-    Y[site][(lag+1):N_years]  ~ normal(alpha[site][(lag+1):N_years] + X[site][(lag+1):N_years] * beta + u[site], sigma); 
+    u[site] ~ normal(0, sigma_alpha);
+  }
+  
+  for (site in 1:N_sites){
+    Y[site][(lag+1):N_years]  ~ normal(alpha[site][(lag+1):N_years] + X[site][(lag+1):N_years] * beta + u[site][(lag+1):N_years], sigma); 
     //Y[site][(lag+1):N_years]  ~ normal(alpha[site][(lag+1):N_years] + X[site][(lag+1):N_years] * beta, sigma[site]); 
   }
 } 
