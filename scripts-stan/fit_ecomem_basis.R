@@ -52,12 +52,12 @@ N_sites = nrow(Y)
 X1 = t(X1)
 X2 = t(X2)
 
-N_covars = 1
+N_covars = 2
 
 X = array(NA, c(N_sites, N_years, N_covars))
 
 X[,,1] = X1
-#X[,,2] = X2
+X[,,2] = X2
 
 d = t(d)
 

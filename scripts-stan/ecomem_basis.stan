@@ -24,7 +24,6 @@ data {
   int<lower=0> n_knots;
   
   vector[N_years] Y[N_sites];
-//  vector[N_years] X[N_sites];
   matrix[N_years, N_covars] X[N_sites];
   vector[N_years] d[N_sites];
   vector[N_years] fire;
@@ -41,9 +40,10 @@ transformed data {
 parameters { 
   //real<lower=1e-6> tau; 
   real<lower=1.0/15.0, upper=1> tau_fire; 
-  real<lower=1e-6> sigma;
-  //vector<lower=1e-6>[N_sites] sigma;
+  //real<lower=1e-6> sigma;
+  vector<lower=1e-6>[N_sites] sigma;
   real<lower=1e-6> sigma_alpha;
+  //vector<lower=1e-6>[N_years] u[N_sites];
   vector[N_years] u[N_sites];
   
   vector[N_covars] beta;
@@ -104,7 +104,7 @@ transformed parameters {
   // f = rep_vector(0, N_years);
   // for (year in (lag+1):N_years) {
   //   for (l in 0:lag){
-  //       f[year] = f[year] + fire[year-l] * spherical(year-l, phi_fire); 
+  //       f[year] = f[year] + fire[year-l] * spherical(year-l, phi_fire);
   //   }
   // }
   
@@ -119,6 +119,7 @@ transformed parameters {
     }
   
   for (site in 1:N_sites) {
+    //alpha[site][1:lag] = gamma0 + f[1:lag] * gamma2;
     //alpha[site][(lag+1):N_years] = gamma_0 + z[site][(lag+1):N_years] * gamma_1[N_sites];
     alpha[site][(lag+1):N_years] = gamma0 + z[site][(lag+1):N_years] * gamma1 + f[(lag+1):N_years] * gamma2;
     //alpha[site][(lag+1):N_years] =  alpha[site][(lag+1):N_years] + f[(lag+1):N_years] * gamma2;
@@ -140,17 +141,31 @@ model {
   gamma0 ~ normal(0, 1e5);
   gamma1 ~ normal(0, 1e5);
   gamma2 ~ normal(0, 1e5);
-  
+
+  // gamma0 ~ normal(0, 1e5);
+  // gamma1 ~ normal(0, 1e5);
+  // gamma2 ~ normal(0, 1e5);
+
   for (site in 1:N_sites){
     u[site] ~ normal(0, sigma_alpha);
   }
+
   
+  // for (site in 1:N_sites){
+  //   u[site] ~ cauchy(0, sigma_alpha);
+  // }
   
   eta ~ multi_normal(rep_vector(0, n_basis), sigma_eta^2 * S_inv);
 
   for (site in 1:N_sites){
-    Y[site][(lag+1):N_years]  ~ normal(alpha[site][(lag+1):N_years] + X[site][(lag+1):N_years] * beta + u[site][(lag+1):N_years], sigma); 
+    // working
+    //Y[site]  ~ normal(alpha[site] + X[site] * beta + u[site], sigma[site]); 
+    Y[site][(lag+1):N_years]  ~ normal(alpha[site][(lag+1):N_years] + X[site][(lag+1):N_years] * beta + u[site][(lag+1):N_years], sigma[site]); 
     //Y[site][(lag+1):N_years]  ~ normal(alpha[site][(lag+1):N_years] + X[site][(lag+1):N_years] * beta + u[site][(lag+1):N_years], sigma); 
+    //Y[site][(lag+1):N_years]  ~ normal(alpha[site][(lag+1):N_years] + X[site][(lag+1):N_years] * beta, sigma); 
+    //Y[site][(lag+1):N_years]  ~ normal(alpha[site][(lag+1):N_years] + X[site][(lag+1):N_years] * beta, u[site][(lag+1):N_years]); 
   }
 } 
+
+
 
