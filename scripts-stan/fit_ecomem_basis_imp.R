@@ -5,13 +5,16 @@ library("rstan")
 ## read in the data
 #######################################################################################
 
-BTP = read.csv("data/BTP-BI.csv", header=TRUE)
-CBS = read.csv("data/CBS-BI.csv", header=TRUE)
-TOW = read.csv("data/TOW-BI.csv", header=TRUE)
-# 
-# BTP.sub = BTP[apply(BTP[,c('chron', 'tmin.may', 'pcp.aug', 'pdsi.sep')], 1, function(x) all(!is.na(x))),]
-# CBS.sub = CBS[apply(CBS[,c('chron', 'tmin.may', 'pcp.aug', 'pdsi.sep')], 1, function(x) all(!is.na(x))),]
-# TOW.sub = TOW[apply(BTP[,c('chron', 'tmin.may', 'pcp.aug', 'pdsi.sep')], 1, function(x) all(!is.na(x))),]
+
+sites = c('BTP', 'CBS', 'TOW')
+fnames = c("data/BTP-BI.csv", "data/CBS-BI.csv", "data/TOW-BI.csv")
+N_sites = length(sites)
+
+raw = list()
+for (site in 1:N_sites){
+  raw[[site]] = read.csv(fnames[site], header=TRUE)
+}
+names(raw) = sites
 
 fire.raw = data.frame(year = seq(1650, 2017, by=1), fire = rep(0))
 fire.raw[which(fire.raw$year %in% c(1664, 1804, 1900)), 'fire'] = 1
@@ -19,32 +22,33 @@ fire.raw[which(fire.raw$year %in% c(1664, 1804, 1900)), 'fire'] = 1
 ## find the start year and end year
 ## for now require that chronologies and fire record all be the same length with no NA values
 ## climate data of shorter length NA values will be imputed
-year_upper = min(max(BTP$year, na.rm=TRUE), max(CBS$year, na.rm=TRUE), max(TOW$year, na.rm=TRUE))
-year_lower = max(min(BTP$year, na.rm=TRUE), min(CBS$year, na.rm=TRUE), min(TOW$year, na.rm=TRUE), min(fire.raw$year[which(fire.raw$fire==1)]))
+year_upper = NA
+year_lower = NA
+for (site in 1:N_sites){
+  year_upper = min(year_upper, max(raw[[site]]$year, na.rm=TRUE), na.rm=TRUE)
+  year_lower = max(year_lower, min(raw[[site]]$year, na.rm=TRUE), na.rm=TRUE)
+}
+
+years = seq(year_lower, year_upper)
+N_years = length(years)
 
 # subset site and fire data to selected years
-BTP.sub = BTP[which(BTP$year %in% seq(year_lower, year_upper)),]
-CBS.sub = CBS[which(CBS$year %in% seq(year_lower, year_upper)),]
-TOW.sub = TOW[which(TOW$year %in% seq(year_lower, year_upper)),]
+for (site in 1:N_sites){ 
+ raw[[site]] = raw[[site]][which(raw[[site]]$year %in% years),]
+}
 
-fire.raw = fire.raw[which(fire.raw$year %in% BTP.sub$year),]
+fire.raw = fire.raw[which(fire.raw$year %in% years),]
 
 ## define data objects
 
 # chronologies
-Y  = as.matrix(data.frame(BTP.sub$chron, CBS.sub$chron, TOW.sub$chron)) 
-
-Y = t(Y)
-
-N_years = ncol(Y)
-N_sites = nrow(Y)
-
+Y = t(matrix(unlist(lapply(raw, function(x) x$chron)), ncol=3, byrow=FALSE))
 
 # continuous memory var
 mem_var = 'tmin.may'
 lag = 6
 
-d = t(as.matrix(data.frame(BTP.sub[, mem_var], CBS.sub[, mem_var], TOW.sub[, mem_var])))
+d = t(matrix(unlist(lapply(raw, function(x) x[,mem_var])), ncol=3, byrow=FALSE))
 
 # binary memory var
 fire.raw = as.matrix(fire.raw$fire)
@@ -56,7 +60,7 @@ N_covars = length(covars)
 
 X = array(NA, c(N_sites, N_years, N_covars))
 for (i in 1:N_covars){
-  X[,,i] = t(as.matrix(data.frame(BTP.sub[,covars[i]], CBS.sub[covars[i]], TOW.sub[covars[i]])))
+  X[,,i] = t(matrix(unlist(lapply(raw, function(x) x[,covars[i]])), ncol=3, byrow=FALSE))
 }
 
 idx.short.na  = which(apply(X, 2, function(x) any(is.na(x))))
@@ -66,7 +70,7 @@ for (i in 1:N_covars){
   X[,idx.short.na,i] =  matrix(rowMeans(X[,,i], na.rm=TRUE))[,rep(1, length(idx.short.na))]
 }
 
-d[idx.short.na,]  = matrix(rowMeans(d, na.rm=TRUE))[,rep(1, length(idx.short.na))]
+d[,idx.short.na]  = matrix(rowMeans(d, na.rm=TRUE))[,rep(1, length(idx.short.na))]
 
 
 X_nmiss = length(idx.short.na)
@@ -153,7 +157,7 @@ dat = list(N_years = N_years,
            X_index = X_index,
            d_index = d_index)
 
-saveRDS(dat, 'scripts-stan/output/data_ecomem_basis_imp_test.RDS')
+saveRDS(dat, 'scripts-stan/output/data_ecomem_basis_imp.RDS')
 
 # 
 # #######################################################################################
@@ -212,7 +216,7 @@ N_iter = 500
 #rstan_options(auto_write = TRUE)
 #options(mc.cores = parallel::detectCores())
 
-sm<-stan_model("scripts-stan/ecomem_basis_imp_test.stan")
+sm<-stan_model("scripts-stan/ecomem_basis_imp.stan")
 
 fit<-sampling(sm,
               data=dat,
@@ -221,5 +225,5 @@ fit<-sampling(sm,
               cores = 1)#,
               #init = inits)#,control = list(adapt_delta=0.95))
 
-saveRDS(fit, 'scripts-stan/output/fit_ecomem_basis_imp_test.RDS')
+saveRDS(fit, 'scripts-stan/output/fit_ecomem_basis_imp.RDS')
 
