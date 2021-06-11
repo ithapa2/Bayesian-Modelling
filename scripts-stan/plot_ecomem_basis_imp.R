@@ -1,5 +1,7 @@
 library(ggplot2)
 library(rstan)
+library(reshape2)
+
 #######################################################################################
 ## spherical decay function
 #######################################################################################
@@ -20,9 +22,9 @@ spherical <- function(x, phi) {
 #######################################################################################
 ## load and extract posterior samples
 #######################################################################################
-fit = readRDS('scripts-stan/output/fit_ecomem_basis_imp_test.RDS')
+fit = readRDS('scripts-stan/output/fit_ecomem_basis_imp.RDS')
 
-suff = 'imp_test'
+suff = 'imp'
 
 plot(fit)
 
@@ -36,9 +38,10 @@ names(post)
 ## load data
 #######################################################################################
 
-dat = readRDS('scripts-stan/output/data_ecomem_basis_imp_test.RDS')
+dat = readRDS('scripts-stan/output/data_ecomem_basis_imp.RDS')
 
 n_basis = dat$n_basis
+N_sites = dat$N_sites
 
 #######################################################################################
 ## plot output
@@ -75,13 +78,15 @@ ggplot(data=mem.fire.dat) +
   scale_x_continuous(name="Lag", breaks=seq(0, 6))
 ggsave(paste0('scripts-stan/figures/antecedent-weights-fire_', suff, '.png'))
 
-library(reshape2)
-mem.fire.melt = melt(mem.fire.iter)
-colnames(mem.fire.melt) = c('iter', 'lag', 'value')
+
+# mem.fire.melt = melt(mem.fire.iter)
+# colnames(mem.fire.melt) = c('iter', 'lag', 'value')
 
 ## gamma parameters (memory magnitude parameters)
 
-gamma = cbind(post$gamma0, post$gamma1, post$gamma2)
+gamma_idx = which(substr(names(post), 1, 5) == "gamma")
+
+gamma = matrix(unlist(post[gamma_idx]), ncol = length(gamma_idx), byrow = FALSE)
 colnames(gamma) = paste0('gamma', seq(0,ncol(gamma)-1))
 gamma.melt = melt(gamma)
 
@@ -116,26 +121,34 @@ gamma.quants = apply(gamma, 2, quantile, c(0.05, 0.5, 0.95))
 gamma.quants
 coef.dat = data.frame(par=paste0('gamma', seq(0,ncol(gamma)-1)), t(gamma.quants))
 
-beta = post$beta
+
+beta_idx = which(substr(names(post), 1, 4) == "beta")
+
+beta = matrix(unlist(post[beta_idx]), ncol = length(beta_idx), byrow = FALSE)
+colnames(beta) = paste0('beta', seq(0,ncol(beta)-1))
+
 beta.quants = apply(beta, 2, quantile, c(0.05, 0.5, 0.95))
 beta.quants
-coef.dat = rbind(coef.dat, data.frame(par=c('beta1', 'beta2'), t(beta.quants)))
-coef.dat = data.frame(panel=c(1,1, 2, 3, 3), coef.dat)
+coef.dat = rbind(coef.dat, data.frame(par=colnames(beta), t(beta.quants)))
+# coef.dat = data.frame(panel=c(1,1, 2, 3, 3), coef.dat)
 
-coef.dat = coef.dat
+# coef.dat = coef.dat
 
+coef.dat
+
+# plot gammas and betas
 ggplot(data=coef.dat) +
   geom_point(aes(y=par, x=X50.)) +
   geom_linerange(aes(y=par, xmin=X5., xmax=X95.)) +
   theme_bw() +
   theme(text = element_text(size=22))
 
-ggplot(data=coef.dat[c(1,2,4),]) +
-  geom_point(aes(y=par, x=X50.)) +
-  geom_linerange(aes(y=par, xmin=X5., xmax=X95.)) +
-  theme_bw() +
-  theme(text = element_text(size=22)) +
-  facet_grid(par~., scales="free")
+# ggplot(data=coef.dat[c(1,2,4),]) +
+#   geom_point(aes(y=par, x=X50.)) +
+#   geom_linerange(aes(y=par, xmin=X5., xmax=X95.)) +
+#   theme_bw() +
+#   theme(text = element_text(size=22)) +
+#   facet_grid(par~., scales="free")
 
 ggplot(data=coef.dat) +
   geom_point(aes(y=par, x=X50.)) +
@@ -145,32 +158,32 @@ ggplot(data=coef.dat) +
   facet_grid(par~., scales="free")
 
 
-ggplot(data=coef.dat[c(1,2),]) +
-  geom_point(aes(y=par, x=X50.), size=2) +
-  geom_linerange(aes(y=par,xmin=X5., xmax=X95.), lwd=1) +
-  theme_bw() +
-  theme(text = element_text(size=22),
-        axis.text.y=element_blank(),
-        axis.ticks.y = element_blank()) +
-  facet_grid(par~., scales="free") + 
-  ylab('') +
-  geom_vline(xintercept=0, colour="red", linetype="dashed") #+
-  #scale_x_continuous(name="Value", limits=c(-0.008, 0)) 
-ggsave(paste0('scripts-stan/figures/gamma-credible_', suff, '.png'))
+# ggplot(data=coef.dat[c(1,2),]) +
+#   geom_point(aes(y=par, x=X50.), size=2) +
+#   geom_linerange(aes(y=par,xmin=X5., xmax=X95.), lwd=1) +
+#   theme_bw() +
+#   theme(text = element_text(size=22),
+#         axis.text.y=element_blank(),
+#         axis.ticks.y = element_blank()) +
+#   facet_grid(par~., scales="free") + 
+#   ylab('') +
+#   geom_vline(xintercept=0, colour="red", linetype="dashed") #+
+#   #scale_x_continuous(name="Value", limits=c(-0.008, 0)) 
+# ggsave(paste0('scripts-stan/figures/gamma-credible_', suff, '.png'))
 
 
-ggplot(data=coef.dat[c(3),]) +
-  geom_point(aes(y=par, x=X50.), size=2) +
-  geom_linerange(aes(y=par,xmin=X5., xmax=X95.), lwd=1) +
-  theme_bw() +
-  theme(text = element_text(size=22),
-        axis.text.y=element_blank(),
-        axis.ticks.y = element_blank()) +
-  facet_grid(par~., scales="free") + 
-  ylab('') +
-  geom_vline(xintercept=0, colour="red", linetype="dashed") #+
-#scale_x_continuous(name="Value", limits=c(-0.008, 0)) 
-ggsave(paste0('scripts-stan/figures/gamma-credible_', suff, '.png'))
+# ggplot(data=coef.dat[c(3),]) +
+#   geom_point(aes(y=par, x=X50.), size=2) +
+#   geom_linerange(aes(y=par,xmin=X5., xmax=X95.), lwd=1) +
+#   theme_bw() +
+#   theme(text = element_text(size=22),
+#         axis.text.y=element_blank(),
+#         axis.ticks.y = element_blank()) +
+#   facet_grid(par~., scales="free") + 
+#   ylab('') +
+#   geom_vline(xintercept=0, colour="red", linetype="dashed") #+
+# #scale_x_continuous(name="Value", limits=c(-0.008, 0)) 
+# ggsave(paste0('scripts-stan/figures/gamma-credible_', suff, '.png'))
 
 
 ggplot(data=coef.dat[c(4,5),]) +
@@ -222,6 +235,3 @@ plot(seq(0, lag), w_mean)
 
 hist(post$sigma)
 hist(post$sigma_alpha)
-
-
-plot(post$X_imp)
