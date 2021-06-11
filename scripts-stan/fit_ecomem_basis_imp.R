@@ -38,7 +38,7 @@ for (site in 1:N_sites){
 }
 names(raw) = sites
 
-fire.raw = data.frame(year = seq(1650, 2017, by=1), fire = rep(0))
+fire.raw = data.frame(year = seq(1600, 2017, by=1), fire = rep(0))
 fire.raw[which(fire.raw$year %in% c(1664, 1804, 1900)), 'fire'] = 1
 
 ## find the start year and end year
@@ -64,7 +64,7 @@ fire.raw = fire.raw[which(fire.raw$year %in% years),]
 ## define data objects
 
 # chronologies
-Y = t(matrix(unlist(lapply(raw, function(x) x$chron)), ncol=3, byrow=FALSE))
+Y = t(matrix(unlist(lapply(raw, function(x) x$chron)), ncol=N_sites, byrow=FALSE))
 
 # continuous memory var
 d = t(matrix(unlist(lapply(raw, function(x) x[,mem_var])), ncol=N_sites, byrow=FALSE))
