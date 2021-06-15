@@ -5,9 +5,31 @@ library("rstan")
 ## read in the data
 #######################################################################################
 
+# possible sites
+# sites = c('BTP', 'CBS', 'TOW')
+# fnames = c("data/BTP-BI.csv", "data/CBS-BI.csv", "data/TOW-BI.csv")
 
-sites = c('BTP', 'CBS', 'TOW')
-fnames = c("data/BTP-BI.csv", "data/CBS-BI.csv", "data/TOW-BI.csv")
+# indicate sites of interest and corresponding file names
+sites = c('BTP')
+fnames = c("data/BTP-BI.csv")
+
+#######################################################################################
+## specify variables and lag
+#######################################################################################
+
+# continuous memory var
+# currently must have exactly one
+mem_var = 'tmin.may'
+lag = 6
+
+# covariates
+# currently must have one or more
+covars = c('pcp.aug', 'pdsi.sep')
+
+#######################################################################################
+## prepare data for stan model
+#######################################################################################
+
 N_sites = length(sites)
 
 raw = list()
@@ -16,7 +38,7 @@ for (site in 1:N_sites){
 }
 names(raw) = sites
 
-fire.raw = data.frame(year = seq(1650, 2017, by=1), fire = rep(0))
+fire.raw = data.frame(year = seq(1600, 2017, by=1), fire = rep(0))
 fire.raw[which(fire.raw$year %in% c(1664, 1804, 1900)), 'fire'] = 1
 
 ## find the start year and end year
@@ -42,35 +64,37 @@ fire.raw = fire.raw[which(fire.raw$year %in% years),]
 ## define data objects
 
 # chronologies
-Y = t(matrix(unlist(lapply(raw, function(x) x$chron)), ncol=3, byrow=FALSE))
+Y = t(matrix(unlist(lapply(raw, function(x) x$chron)), ncol=N_sites, byrow=FALSE))
 
 # continuous memory var
-mem_var = 'tmin.may'
-lag = 6
-
-d = t(matrix(unlist(lapply(raw, function(x) x[,mem_var])), ncol=3, byrow=FALSE))
+d = t(matrix(unlist(lapply(raw, function(x) x[,mem_var])), ncol=N_sites, byrow=FALSE))
 
 # binary memory var
 fire.raw = as.matrix(fire.raw$fire)
 fire = as.vector(fire.raw)
 
 # covars
-covars = c('pcp.aug', 'pdsi.sep')
+
 N_covars = length(covars)
 
 X = array(NA, c(N_sites, N_years, N_covars))
 for (i in 1:N_covars){
-  X[,,i] = t(matrix(unlist(lapply(raw, function(x) x[,covars[i]])), ncol=3, byrow=FALSE))
+  X[,,i] = t(matrix(unlist(lapply(raw, function(x) x[,covars[i]])), ncol=N_sites, byrow=FALSE))
 }
 
 idx.short.na  = which(apply(X, 2, function(x) any(is.na(x))))
 # idx.short.na.d  = which(apply(d, 1, function(x) any(is.na(x))))
 
 for (i in 1:N_covars){
-  X[,idx.short.na,i] =  matrix(rowMeans(X[,,i], na.rm=TRUE))[,rep(1, length(idx.short.na))]
+  if (N_sites != 1){
+    X[,idx.short.na,i] =  matrix(rowMeans(X[,,i], na.rm=TRUE))[,rep(1, length(idx.short.na))]
+    d[,idx.short.na]  = matrix(rowMeans(d, na.rm=TRUE))[,rep(1, length(idx.short.na))]
+  } else if (N_sites == 1){
+    X[,idx.short.na,i] =  rep(mean(X[,,i], na.rm=TRUE), length(idx.short.na))
+    d[,idx.short.na]  = rep(mean(d, na.rm=TRUE), length(idx.short.na))
+  }
 }
 
-d[,idx.short.na]  = matrix(rowMeans(d, na.rm=TRUE))[,rep(1, length(idx.short.na))]
 
 
 X_nmiss = length(idx.short.na)
@@ -82,16 +106,6 @@ d_index = idx.short.na
 #######################################################################################
 ## splines
 #######################################################################################
-
-# library(splines)
-# set.seed(1234)
-# num_knots <- lag # true number of knots
-# spline_degree <- 3
-# num_basis <- num_knots + spline_degree - 1
-# knots <- seq(from=0, to=lag, by=1)
-# B <- t(bs(knots, knots=knots, df=num_basis, degree=spline_degree, intercept = TRUE))
-# num_data = length(X.basis)
-
 
 t.s = (0:lag)/lag
 time = data.frame(t=0:lag,t.s=t.s)
@@ -137,7 +151,7 @@ n_knots = nrow(B)
 # uni.wts = rep(1/(inputs$L[j]+1),inputs$L[j]+1)
 # eta = rnorm(inputs$bf[[j]]$k,coef(lm(uni.wts~inputs$bf[[j]]$H-1)),0.1)
 #######################################################################################
-## data list
+## compile data as a list; save data as RDS object
 #######################################################################################
 
 dat = list(N_years = N_years,
@@ -161,7 +175,7 @@ saveRDS(dat, 'scripts-stan/output/data_ecomem_basis_imp.RDS')
 
 # 
 # #######################################################################################
-# ## inits
+# ## specify model initial conditions
 # #######################################################################################
 # sigma_eta = 0.1;
 # 
@@ -208,7 +222,7 @@ saveRDS(dat, 'scripts-stan/output/data_ecomem_basis_imp.RDS')
 #                  d_imp = d_imp))
     
 #######################################################################################
-## sampling
+## compile model and perform sampling
 #######################################################################################
 
 N_iter = 500
@@ -216,8 +230,11 @@ N_iter = 500
 #rstan_options(auto_write = TRUE)
 #options(mc.cores = parallel::detectCores())
 
+# compile the stand model
+# must be done every time a change is made to the .stan file
 sm<-stan_model("scripts-stan/ecomem_basis_imp.stan")
 
+# parameter estimation
 fit<-sampling(sm,
               data=dat,
               iter=N_iter,
@@ -225,5 +242,6 @@ fit<-sampling(sm,
               cores = 1)#,
               #init = inits)#,control = list(adapt_delta=0.95))
 
+# save stan fit object for subsequent analysis
 saveRDS(fit, 'scripts-stan/output/fit_ecomem_basis_imp.RDS')
 
