@@ -10,8 +10,8 @@ library("rstan")
 # fnames = c("data/BTP-BI.csv", "data/CBS-BI.csv", "data/TOW-BI.csv")
 
 # indicate sites of interest and corresponding file names
-sites = c('BTP')
-fnames = c("data/BTP-BI.csv")
+sites = c('PSME')
+fnames = c("data/WOLF_PSME_FINAL-std.csv")
 
 #######################################################################################
 ## specify variables and lag
@@ -19,12 +19,12 @@ fnames = c("data/BTP-BI.csv")
 
 # continuous memory var
 # currently must have exactly one
-mem_var = 'tmin.may'
+mem_var = 'ppt.pjja'
 lag = 6
 
 # covariates
 # currently must have one or more
-covars = c('pcp.aug', 'pdsi.sep')
+covars = c('tmax.paug', 'pdsi.poct')
 
 #######################################################################################
 ## prepare data for stan model
@@ -38,8 +38,8 @@ for (site in 1:N_sites){
 }
 names(raw) = sites
 
-fire.raw = data.frame(year = seq(1600, 2017, by=1), fire = rep(0))
-fire.raw[which(fire.raw$year %in% c(1664, 1804, 1900)), 'fire'] = 1
+fire.raw = data.frame(year = seq(736, 2017, by=1), fire = rep(0))
+fire.raw[which(fire.raw$year %in% c(957, 964, 1023, 1056, 1110, 1144, 1148, 1180, 1190, 1213, 1217, 1277, 1278, 1296, 1299, 1306, 1317, 1325, 1355, 1361, 1388, 1407, 1437, 1439, 1446, 1468, 1489, 1492, 1499, 1528, 1531, 1532, 1538, 1543, 1551, 1556, 1561, 1571, 1576, 1580, 1584, 1590, 1593, 1598, 1600, 1626, 1631, 1671, 1703, 1705, 1742, 1765, 1800, 1836, 1842, 1894, 1949, 1956, 1966, 1997)), 'fire'] = 1
 
 ## find the start year and end year
 ## for now require that chronologies and fire record all be the same length with no NA values
@@ -51,12 +51,15 @@ for (site in 1:N_sites){
   year_lower = max(year_lower, min(raw[[site]]$year, na.rm=TRUE), na.rm=TRUE)
 }
 
+year_upper = min(year_upper, max(fire.raw$year))
+year_lower = max(year_lower, min(fire.raw$year))
+
 years = seq(year_lower, year_upper)
 N_years = length(years)
 
 # subset site and fire data to selected years
 for (site in 1:N_sites){ 
- raw[[site]] = raw[[site]][which(raw[[site]]$year %in% years),]
+  raw[[site]] = raw[[site]][which(raw[[site]]$year %in% years),]
 }
 
 fire.raw = fire.raw[which(fire.raw$year %in% years),]
@@ -220,7 +223,7 @@ saveRDS(dat, 'scripts-stan/output/data_ecomem_basis_imp.RDS')
 #                  X1_imp = X1_imp,
 #                  X2_imp = X2_imp,
 #                  d_imp = d_imp))
-    
+
 #######################################################################################
 ## compile model and perform sampling
 #######################################################################################
@@ -240,7 +243,7 @@ fit<-sampling(sm,
               iter=N_iter,
               chains = 1, 
               cores = 1)#,
-              #init = inits)#,control = list(adapt_delta=0.95))
+#init = inits)#,control = list(adapt_delta=0.95))
 
 # save stan fit object for subsequent analysis
 saveRDS(fit, 'scripts-stan/output/fit_ecomem_basis_imp.RDS')
