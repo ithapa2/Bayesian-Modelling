@@ -22,9 +22,13 @@ spherical <- function(x, phi) {
 #######################################################################################
 ## load and extract posterior samples
 #######################################################################################
-fit = readRDS('scripts-stan/output/fit_ecomem_basis_imp.RDS')
+# fit = readRDS('scripts-stan/output/fit_ecomem_basis_imp.RDS')
+# 
+# suff = 'imp'
 
-suff = 'imp'
+suffix = 'ES'
+
+fit = readRDS(paste0('scripts-stan/output/fit_ecomem_basis_imp_', suffix, '.RDS'))
 
 plot(fit)
 
@@ -38,10 +42,11 @@ names(post)
 ## load data
 #######################################################################################
 
-dat = readRDS('scripts-stan/output/data_ecomem_basis_imp.RDS')
+dat = readRDS(paste0('scripts-stan/output/data_ecomem_basis_imp_', suffix, '.RDS'))
 
 n_basis = dat$n_basis
 N_sites = dat$N_sites
+lag = dat$lag
 
 #######################################################################################
 ## plot output
@@ -76,7 +81,7 @@ ggplot(data=mem.fire.dat) +
  # xlab("Lag") +
   ylab("Fire Antecedent Weight") +
   scale_x_continuous(name="Lag", breaks=seq(0, 6))
-ggsave(paste0('scripts-stan/figures/antecedent-weights-fire_', suff, '.png'))
+ggsave(paste0('scripts-stan/figures/antecedent-weights-fire_', suffix, '.png'))
 
 
 # mem.fire.melt = melt(mem.fire.iter)
@@ -96,7 +101,7 @@ ggplot(data=subset(gamma.melt, Var2 %in% c('gamma0', 'gamma1'))) +
   theme_bw() +
   theme(text = element_text(size=22)) +
   facet_wrap(Var2~., scales="free_x")
-ggsave(paste0('scripts-stan/figures/gamma-small-post-density_', suff, '.png'))
+ggsave(paste0('scripts-stan/figures/gamma-small-post-density_', suffix, '.png'))
 
 
 ggplot(data=subset(gamma.melt, Var2 %in% c('gamma0', 'gamma1'))) +
@@ -105,7 +110,7 @@ ggplot(data=subset(gamma.melt, Var2 %in% c('gamma0', 'gamma1'))) +
   theme(text = element_text(size=22)) +
   facet_grid(Var2~., scales="free_y") +
   xlab("Iteration")
-ggsave(paste0('scripts-stan/figures/gamma-small-trace_', suff, '.png'))
+ggsave(paste0('scripts-stan/figures/gamma-small-trace_', suffix, '.png'))
 
 
 ggplot(data=subset(gamma.melt, Var2 %in% c('gamma2'))) +
@@ -114,7 +119,7 @@ ggplot(data=subset(gamma.melt, Var2 %in% c('gamma2'))) +
   theme_bw() +
   theme(text = element_text(size=22)) +
   facet_wrap(Var2~., scales="free_x")
-ggsave(paste0('scripts-stan/figures/gamma2-post-density_', suff, '.png'))
+ggsave(paste0('scripts-stan/figures/gamma2-post-density_', suffix, '.png'))
 
 #quantile(gamma1, c(0.10, 0.5, 0.90))
 gamma.quants = apply(gamma, 2, quantile, c(0.05, 0.5, 0.95))
@@ -139,7 +144,7 @@ coef.dat
 # plot gammas and betas
 ggplot(data=coef.dat) +
   geom_point(aes(y=par, x=X50.)) +
-  geom_linerange(aes(y=par, xmin=X5., xmax=X95.)) +
+  geom_linerange(aes(y=par, xmin=X5., xmax=X95.),) +
   theme_bw() +
   theme(text = element_text(size=22))
 
@@ -197,7 +202,7 @@ ggplot(data=coef.dat[c(4,5),]) +
   ylab('') +
   geom_vline(xintercept=0, colour="red", linetype="dashed") +
   scale_x_continuous(name="Value", limits=c(-0.008, 0)) 
-ggsave(paste0('scripts-stan/figures/beta-credible_', suff, '.png'))
+ggsave(paste0('scripts-stan/figures/beta-credible_', suffix, '.png'))
 
 
 quantile(post$sigma, c(0.10, 0.5, 0.90))
@@ -225,7 +230,7 @@ ggplot(data=w.dat) +
   theme(text = element_text(size=22)) +
   ylab("May Mininum Temperature \n Antecedent Weight") +
   scale_x_continuous(name="Lag", breaks=seq(0, 6))
-ggsave(paste0('scripts-stan/figures/antecedent-weights-tmin-may_', suff, '.png'))
+ggsave(paste0('scripts-stan/figures/antecedent-weights-tmin-may_', suffix, '.png'))
 
 
 
