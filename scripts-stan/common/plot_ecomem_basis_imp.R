@@ -26,8 +26,6 @@ spherical <- function(x, phi) {
 # 
 # suff = 'imp'
 
-suffix = 'ES'
-
 fit = readRDS(paste0('scripts-stan/output/fit_ecomem_basis_imp_', suffix, '.RDS'))
 
 plot(fit)

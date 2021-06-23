@@ -1,35 +1,6 @@
 library("mgcv")
 library("rstan")
 
-#######################################################################################
-## read in the data
-#######################################################################################
-
-# possible sites
-sites = c('BTP', 'CBS', 'TOW')
-fnames = c("data/BTP-BI.csv", "data/CBS-BI.csv", "data/TOW-BI.csv")
-suffix = 'ES'
-
-# indicate sites of interest and corresponding file names
-#sites = c('BTP')
-#fnames = c("data/BTP-BI.csv")
-
-#######################################################################################
-## specify variables and lag
-#######################################################################################
-
-# continuous memory var
-# currently must have exactly one
-mem_var = 'tmin.may'
-lag = 6
-
-# covariates
-# currently must have one or more
-covars = c('pcp.aug', 'pdsi.sep')
-
-#######################################################################################
-## prepare data for stan model
-#######################################################################################
 
 N_sites = length(sites)
 
@@ -38,9 +9,6 @@ for (site in 1:N_sites){
   raw[[site]] = read.csv(fnames[site], header=TRUE)
 }
 names(raw) = sites
-
-fire.raw = data.frame(year = seq(1600, 2017, by=1), fire = rep(0))
-fire.raw[which(fire.raw$year %in% c(1664, 1804, 1900)), 'fire'] = 1
 
 ## find the start year and end year
 ## for now require that chronologies and fire record all be the same length with no NA values
@@ -233,7 +201,7 @@ N_iter = 500
 
 # compile the stand model
 # must be done every time a change is made to the .stan file
-sm<-stan_model("scripts-stan/ecomem_basis_imp.stan")
+sm<-stan_model("scripts-stan/common/ecomem_basis_imp.stan")
 
 # parameter estimation
 fit<-sampling(sm,
