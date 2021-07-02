@@ -2,6 +2,7 @@ library("mgcv")
 library("rstan")
 
 
+
 N_sites = length(sites)
 
 raw = list()
@@ -16,8 +17,18 @@ names(raw) = sites
 year_upper = NA
 year_lower = NA
 for (site in 1:N_sites){
-  year_upper = min(year_upper, max(raw[[site]]$year, na.rm=TRUE), na.rm=TRUE)
-  year_lower = max(year_lower, min(raw[[site]]$year, na.rm=TRUE), na.rm=TRUE)
+  raw_sub = raw[[site]][,c('year', 'chron', mem_var)]
+  raw_sub = raw_sub[apply(raw_sub,1, function(x) all(!is.na(x))),]
+  year_upper = min(year_upper, max(raw_sub$year, na.rm=TRUE), na.rm=TRUE)
+  year_lower = max(year_lower, min(raw_sub$year, na.rm=TRUE), na.rm=TRUE)
+}
+
+year_upper = min(year_upper, max(fire.raw$year))
+year_lower = max(year_lower, min(fire.raw$year))
+
+if (include_outbreak){
+  year_upper = min(year_upper, max(insect$year))
+  year_lower = max(year_lower, min(insect$year))
 }
 
 years = seq(year_lower, year_upper)
@@ -29,6 +40,9 @@ for (site in 1:N_sites){
 }
 
 fire.raw = fire.raw[which(fire.raw$year %in% years),]
+if(include_outbreak){
+  insect = insect[which(insect$year %in% years),]
+}
 
 ## define data objects
 
@@ -41,6 +55,9 @@ d = t(matrix(unlist(lapply(raw, function(x) x[,mem_var])), ncol=N_sites, byrow=F
 # binary memory var
 fire.raw = as.matrix(fire.raw$fire)
 fire = as.vector(fire.raw)
+
+insect = as.matrix(insect$bool)
+insect = as.vector(insect)
 
 # covars
 
@@ -69,8 +86,8 @@ for (i in 1:N_covars){
 X_nmiss = length(idx.short.na)
 d_nmiss = length(idx.short.na)
 
-X_index = idx.short.na
-d_index = idx.short.na
+X_index = array(idx.short.na)
+d_index = array(idx.short.na)
 
 #######################################################################################
 ## splines
@@ -140,7 +157,16 @@ dat = list(N_years = N_years,
            X_index = X_index,
            d_index = d_index)
 
-saveRDS(dat, paste0('scripts-stan/output/data_ecomem_basis_imp_', suffix, '.RDS'))
+if (include_outbreak){
+  dat$outbreak = insect
+}
+
+
+if (!dir.exists(path_output)){
+  dir.create(path_output)
+}
+
+saveRDS(dat, paste0(path_output, '/data_ecomem_basis_imp_', suffix, '.RDS'))
 
 # 
 # #######################################################################################
@@ -201,7 +227,8 @@ N_iter = 500
 
 # compile the stand model
 # must be done every time a change is made to the .stan file
-sm<-stan_model("scripts-stan/common/ecomem_basis_imp.stan")
+#sm<-stan_model("scripts-stan/common/ecomem_basis_imp.stan")
+sm<-stan_model(paste0('scripts-stan/common/', model_name))
 
 # parameter estimation
 fit<-sampling(sm,
@@ -212,5 +239,5 @@ fit<-sampling(sm,
               #init = inits)#,control = list(adapt_delta=0.95))
 
 # save stan fit object for subsequent analysis
-saveRDS(fit, paste0('scripts-stan/output/fit_ecomem_basis_imp_', suffix, '.RDS'))
+saveRDS(fit, paste0(path_output, '/fit_ecomem_basis_imp_', suffix, '.RDS'))
 
