@@ -54,79 +54,268 @@ if (!dir.exists(path_figures)){
   dir.create(path_figures)
 }
 
-## fire memory
+## discrete memory
 
-phi_fire = 1/post$tau_fire
-phi_fire.mean = mean(phi_fire)
-
-x = seq(1e-6, lag, by=0.1)
-mem.fire = unlist(lapply(x, function(x){spherical(x, phi_fire.mean)}))
-
-plot(x, mem.fire, xlab="Year", ylab="Antecedent weight")
-
-mem.fire.iter = matrix(NA, nrow=length(phi_fire), ncol=length(x))
-for (i in 1:length(phi_fire)){
-  print(i)
-  mem.fire.iter[i,] = unlist(lapply(x, function(x){spherical(x, phi_fire[i])}))
-}
-
-
-mem.fire.quants = apply(mem.fire.iter, 2, function(x) quantile(x, c(0.05, 0.5, 0.95)))
-mem.fire.dat = data.frame(x=x, t(mem.fire.quants))
-colnames(mem.fire.dat) = c('x', 'q5', 'q50', 'q95')
-
-ggplot(data=mem.fire.dat) + 
-  geom_line(aes(x=x, y=q50), lwd=2) +
-  geom_ribbon(aes(x=x, ymin=q5, ymax=q95), fill='dodgerblue', alpha=0.4) +
-  theme_bw() +
-  theme(text = element_text(size=22)) + 
-  # xlab("Lag") +
-  ylab("Fire Antecedent Weight") +
-  scale_x_continuous(name="Lag", breaks=seq(0, 6))
-ggsave(paste0(path_figures, '/antecedent-weights-fire_', suffix, '.png'))
-
-
-if (include_outbreak){
-  ## insect memory
+if ((include_outbreak==1)&(include_fire==0)){
+  tau_df = post$tau_dmem 
+  phi_df = 1/tau_df
+  phi_df_mean = mean(phi_df)
   
-  hist(post$tau_outbreak)
+  tau = data.frame(iter = seq(1, length(tau_df)), tau_df)
+  tau_melt = melt(tau, id.vars='iter')
   
-  phi_insect = 1/post$tau_outbreak
-  phi_insect.mean = mean(phi_insect)
+  phi = data.frame(iter = seq(1, length(phi_df)), phi_df)
+  phi_melt = melt(phi, id.vars='iter')
+  
+  ggplot(data=tau_melt) + 
+    geom_histogram(aes(x=value, y = (..count..)/sum(..count..))) + 
+    facet_grid(variable~.) +
+    xlab('phi') +
+    ylab('frequency') +
+    theme_bw()
+  ggsave(paste0(path_figures, '/dmem_tau_hist_', suffix, '.png'))
+  
+  ggplot(data=tau_melt) + 
+    geom_line(aes(x = iter, y = value)) + 
+    facet_grid(variable~., scales = "free_y") +
+    xlab('iter') +
+    ylab('value') +
+    theme_bw()
+  ggsave(paste0(path_figures, '/dmem_tau_trace_', suffix, '.png'))
+  
   
   x = seq(1e-6, lag, by=0.1)
-  mem.insect = unlist(lapply(x, function(x){spherical(x, phi_insect.mean)}))
+  # mem_d = unlist(lapply(x, function(x){spherical(x, phi_d_mean)}))
+  # 
+  # plot(x, mem_dmem, xlab="Year", ylab="Antecedent weight")
   
-  plot(x, mem.insect, xlab="Year", ylab="Antecedent weight")
-  
-  mem.insect.iter = matrix(NA, nrow=length(phi_insect), ncol=length(x))
-  for (i in 1:length(phi_insect)){
+  dfmem_iter = matrix(NA, nrow=length(phi_df), ncol=length(x))
+  for (i in 1:length(phi_df)){
     print(i)
-    mem.insect.iter[i,] = unlist(lapply(x, function(x){spherical(x, phi_insect[i])}))
+    dfmem_iter[i,] = unlist(lapply(x, function(x){spherical(x, phi_df[i])}))
   }
   
-  mem.insect.quants = apply(mem.insect.iter, 2, function(x) quantile(x, c(0.05, 0.5, 0.95)))
-  mem.insect.dat = data.frame(x=x, t(mem.insect.quants))
-  colnames(mem.insect.dat) = c('x', 'q5', 'q50', 'q95')
+  dfmem_quants = apply(dfmem_iter, 2, function(x) quantile(x, c(0.05, 0.5, 0.95)))
+  dfmem_dat = data.frame(type = rep('insect', length(x)), x=x, t(dfmem_quants))
+  colnames(dfmem_dat) = c('type', 'x', 'q5', 'q50', 'q95')
   
-  ggplot(data=mem.insect.dat) + 
-    geom_line(aes(x=x, y=q50), lwd=2) +
-    geom_ribbon(aes(x=x, ymin=q5, ymax=q95), fill='dodgerblue', alpha=0.4) +
+  dmem_dat =dfmem_dat
+  
+  # ggplot(data=dimem_dat) +
+  #   geom_point(aes(x=x, y=q50)) +
+  #   # geom_linerange(aes(y=x, xmin=q5, xmax=q95)) +
+  #   geom_linerange(aes(x=x, ymin=q5, ymax=q95)) +
+  #   theme_bw() + 
+  #   xlab#+
+  #   #scale_y_discrete(limits=rev)
+  
+  # ggplot(data=dimem_dat) +
+  #   geom_point(aes(x=x, y=q50)) +
+  #   # geom_linerange(aes(y=x, xmin=q5, xmax=q95)) +
+  #   geom_linerange(aes(x=x, ymin=q5, ymax=q95)) +
+  #   theme_bw() +
+  #   xlab#+
+  #   #scale_y_discrete(limits=rev)
+  
+  ggplot(data=dmem_dat) + 
+    geom_line(aes(x=x, y=q50, color=type), lwd=1) +
+    geom_ribbon(aes(x=x, ymin=q5, ymax=q95, fill=type), alpha=0.4) +
     theme_bw() +
-    theme(text = element_text(size=22)) + 
+    theme(text = element_text(size=14)) + 
     # xlab("Lag") +
-    ylab("Fire Antecedent Weight") +
+    ylab("Discrete Antecedent Weight") +
     scale_x_continuous(name="Lag", breaks=seq(0, 6))
-  ggsave(paste0(path_figures, '/antecedent-weights-insect_', suffix, '.png'))
+  ggsave(paste0(path_figures, '/dmem_antecedent-weight_', suffix, '.png'))
+  
+}
+if ((include_outbreak==0)&(include_fire==1)){
+  
+  tau_df = post$tau_dmem 
+  phi_df = 1/tau_df
+  phi_df_mean = mean(phi_df)
+  
+  tau = data.frame(iter = seq(1, length(tau_df)), tau_df)
+  tau_melt = melt(tau, id.vars='iter')
+  
+  phi = data.frame(iter = seq(1, length(phi_df)), phi_df)
+  phi_melt = melt(phi, id.vars='iter')
+  
+  ggplot(data=tau_melt) + 
+    geom_histogram(aes(x=value, y = (..count..)/sum(..count..))) + 
+    facet_grid(variable~.) +
+    xlab('phi') +
+    ylab('frequency') +
+    theme_bw()
+  ggsave(paste0(path_figures, '/dmem_tau_hist_', suffix, '.png'))
+  
+  ggplot(data=tau_melt) + 
+    geom_line(aes(x = iter, y = value)) + 
+    facet_grid(variable~., scales = "free_y") +
+    xlab('iter') +
+    ylab('value') +
+    theme_bw()
+  ggsave(paste0(path_figures, '/dmem_tau_trace_', suffix, '.png'))
+  
+  
+  x = seq(1e-6, lag, by=0.1)
+  # mem_d = unlist(lapply(x, function(x){spherical(x, phi_d_mean)}))
+  # 
+  # plot(x, mem_dmem, xlab="Year", ylab="Antecedent weight")
+  
+  dfmem_iter = matrix(NA, nrow=length(phi_df), ncol=length(x))
+  for (i in 1:length(phi_df)){
+    print(i)
+    dfmem_iter[i,] = unlist(lapply(x, function(x){spherical(x, phi_df[i])}))
+  }
+  
+  dfmem_quants = apply(dfmem_iter, 2, function(x) quantile(x, c(0.05, 0.5, 0.95)))
+  dfmem_dat = data.frame(type = rep('fire', length(x)), x=x, t(dfmem_quants))
+  colnames(dfmem_dat) = c('type', 'x', 'q5', 'q50', 'q95')
+  
+  dmem_dat =dfmem_dat
+  
+  # ggplot(data=dimem_dat) +
+  #   geom_point(aes(x=x, y=q50)) +
+  #   # geom_linerange(aes(y=x, xmin=q5, xmax=q95)) +
+  #   geom_linerange(aes(x=x, ymin=q5, ymax=q95)) +
+  #   theme_bw() + 
+  #   xlab#+
+  #   #scale_y_discrete(limits=rev)
+  
+  # ggplot(data=dimem_dat) +
+  #   geom_point(aes(x=x, y=q50)) +
+  #   # geom_linerange(aes(y=x, xmin=q5, xmax=q95)) +
+  #   geom_linerange(aes(x=x, ymin=q5, ymax=q95)) +
+  #   theme_bw() +
+  #   xlab#+
+  #   #scale_y_discrete(limits=rev)
+  
+  ggplot(data=dmem_dat) + 
+    geom_line(aes(x=x, y=q50, color=type), lwd=1) +
+    geom_ribbon(aes(x=x, ymin=q5, ymax=q95, fill=type), alpha=0.4) +
+    theme_bw() +
+    theme(text = element_text(size=14)) + 
+    # xlab("Lag") +
+    ylab("Discrete Antecedent Weight") +
+    scale_x_continuous(name="Lag", breaks=seq(0, 6))
+  ggsave(paste0(path_figures, '/dmem_antecedent-weight_', suffix, '.png'))
+
 }
 
-# mem.fire.melt = melt(mem.fire.iter)
-# colnames(mem.fire.melt) = c('iter', 'lag', 'value')
+if ((include_outbreak)&(include_fire)){
+ 
+  tau_di = post$tau_dimem 
+  phi_di = 1/tau_di
+  phi_di_mean = mean(phi_di)
+  
+  tau_df = post$tau_dfmem
+  phi_df = 1/tau_df
+  phi_df_mean = mean(phi_df)
+  
+  tau = data.frame(iter = seq(1, length(tau_df)), tau_di, tau_df)
+  tau_melt = melt(tau, id.vars='iter')
+  
+  phi = data.frame(iter = seq(1, length(phi_df)), phi_di, phi_df)
+  phi_melt = melt(phi, id.vars='iter')
+  
+  ggplot(data=tau_melt) + 
+    geom_histogram(aes(x=value, y = (..count..)/sum(..count..))) + 
+    facet_grid(variable~.) +
+    xlab('phi') +
+    ylab('frequency') +
+    theme_bw()
+  ggsave(paste0(path_figures, '/dmem_tau_hist_', suffix, '.png'))
+  
+  ggplot(data=tau_melt) + 
+    geom_line(aes(x = iter, y = value)) + 
+    facet_grid(variable~., scales = "free_y") +
+    xlab('iter') +
+    ylab('value') +
+    theme_bw()
+  ggsave(paste0(path_figures, '/dmem_tau_trace_', suffix, '.png'))
+  
+  
+  x = seq(1e-6, lag, by=0.1)
+  # mem_d = unlist(lapply(x, function(x){spherical(x, phi_d_mean)}))
+  # 
+  # plot(x, mem_dmem, xlab="Year", ylab="Antecedent weight")
+  
+  dimem_iter = matrix(NA, nrow=length(phi_di), ncol=length(x))
+  for (i in 1:length(phi_di)){
+    print(i)
+    dimem_iter[i,] = unlist(lapply(x, function(x){spherical(x, phi_di[i])}))
+  }
+  
+  dimem_quants = apply(dimem_iter, 2, function(x) quantile(x, c(0.05, 0.5, 0.95)))
+  dimem_dat = data.frame(type = rep('insect', length(x)), x=x, t(dimem_quants))
+  colnames(dimem_dat) = c('type', 'x', 'q5', 'q50', 'q95')
+  
+  dfmem_iter = matrix(NA, nrow=length(phi_df), ncol=length(x))
+  for (i in 1:length(phi_df)){
+    print(i)
+    dfmem_iter[i,] = unlist(lapply(x, function(x){spherical(x, phi_df[i])}))
+  }
+  
+  dfmem_quants = apply(dfmem_iter, 2, function(x) quantile(x, c(0.05, 0.5, 0.95)))
+  dfmem_dat = data.frame(type = rep('fire', length(x)), x=x, t(dfmem_quants))
+  colnames(dfmem_dat) = c('type', 'x', 'q5', 'q50', 'q95')
+  
+  dmem_dat = rbind(dimem_dat, dfmem_dat)
+  
+  # ggplot(data=dimem_dat) +
+  #   geom_point(aes(x=x, y=q50)) +
+  #   # geom_linerange(aes(y=x, xmin=q5, xmax=q95)) +
+  #   geom_linerange(aes(x=x, ymin=q5, ymax=q95)) +
+  #   theme_bw() + 
+  #   xlab#+
+  #   #scale_y_discrete(limits=rev)
+  
+  # ggplot(data=dimem_dat) +
+  #   geom_point(aes(x=x, y=q50)) +
+  #   # geom_linerange(aes(y=x, xmin=q5, xmax=q95)) +
+  #   geom_linerange(aes(x=x, ymin=q5, ymax=q95)) +
+  #   theme_bw() +
+  #   xlab#+
+  #   #scale_y_discrete(limits=rev)
+  
+  ggplot(data=dmem_dat) + 
+    geom_line(aes(x=x, y=q50, color=type), lwd=1) +
+    geom_ribbon(aes(x=x, ymin=q5, ymax=q95, fill=type), alpha=0.4) +
+    theme_bw() +
+    theme(text = element_text(size=14)) + 
+    # xlab("Lag") +
+    ylab("Discrete Antecedent Weight") +
+    scale_x_continuous(name="Lag", breaks=seq(0, 6))
+  ggsave(paste0(path_figures, '/dmem_antecedent-weight_', suffix, '.png'))
+}
 
-## gamma parameters (memory magnitude parameters)
+## continuous memory
 
+w = post$w
+w_quants = apply(w, 2, quantile, c(0.05, 0.5, 0.95))
+w_dat = data.frame(par=paste0('w', seq(0,n_basis)), t(w_quants))
+colnames(w_dat) = c('par', 'q5', 'q50', 'q95')
+
+ggplot(data=w_dat) +
+  geom_point(aes(x=par, y=q50)) +
+  geom_linerange(aes(x=par, ymin=q5, ymax=q95)) +
+  theme_bw() #+
+  #scale_y_discrete(limits=rev)
+
+vals = seq(0, lag)
+w_dat$vals = vals
+
+ggplot(data=w_dat) + 
+  geom_line(aes(x=vals, y=q50),) +
+  geom_ribbon(aes(x=vals, ymin=q5, ymax=q95), fill='dodgerblue', alpha=0.5) +
+  theme_bw() +
+  theme(text = element_text(size=16)) +
+  ylab("Continuous \n Antecedent Weight") +
+  scale_x_continuous(name="Lag", breaks=seq(0, 6))
+ggsave(paste0(path_figures, '/cmem_antecedent-weight-_', suffix, '.png'))
+
+## gamma
 gamma_idx = which(substr(names(post), 1, 5) == "gamma")
-
 
 gamma_dim = rep(NA, length(gamma_idx))
 gamma_names = c()
@@ -143,57 +332,41 @@ for (i in 1:length(gamma_idx)){
   gamma_names = c(gamma_names, gamma_name_rep)
 }
 
-#gamma = matrix(unlist(post[gamma_idx]), ncol = length(gamma_idx), byrow = FALSE)
 gamma = matrix(unlist(post[gamma_idx]), ncol = sum(gamma_dim), byrow = FALSE)
-
-
-#colnames(gamma) = paste0('gamma', seq(0,ncol(gamma)-1))
 colnames(gamma) = gamma_names
-gamma.melt = melt(gamma)
 
-gamma.melt$type = substr(gamma.melt$Var2, 1, 6)
+gamma_melt = melt(gamma)
+gamma_melt$type = substr(gamma_melt$Var2, 1, 6)
+colnames(gamma_melt) = c('iter', 'variable', 'value', 'type')
 
-ggplot(data=subset(gamma.melt, type %in% c('gamma0', 'gamma1'))) +
-  geom_density(aes(x=value), lwd=2, fill="dodgerblue", alpha=0.2) +
-  geom_rug(aes(x =value, y = 0), position = position_jitter(height = 0)) +
-  theme_bw() +
-  theme(text = element_text(size=14)) +
-  facet_wrap(Var2~., scales="free_x")
-ggsave(paste0(path_figures, '/gamma-small-post-density_', suffix, '.png'))
+ggplot(data=gamma_melt) + 
+  geom_histogram(aes(x=value, y = (..count..)/sum(..count..))) + 
+  geom_vline(xintercept=0, lty=2) +
+  facet_wrap(~variable, scales='free_x') +
+  xlab('gamma') +
+  ylab('frequency') +
+  theme_bw() #+ 
+  #coord_flip()
+ggsave(paste0(path_figures, '/gamma_hist_', suffix, '.png'))
+
+ggplot(data=gamma_melt) + 
+  geom_line(aes(x = iter, y = value)) + 
+  facet_grid(variable~., scales = "free_y") +
+  xlab('iter') +
+  ylab('value') +
+  theme_bw()
+ggsave(paste0(path_figures, '/gamma_trace_', suffix, '.png'))
 
 
-ggplot(data=subset(gamma.melt, type %in% c('gamma0', 'gamma1'))) +
-  geom_line(aes(x=Var1, y=value), lwd=2) +
-  theme_bw() +
-  theme(text = element_text(size=14)) +
-  facet_grid(Var2~., scales="free_y") +
-  xlab("Iteration")
-ggsave(paste0(path_figures, '/gamma-small-trace_', suffix, '.png'))
+# #quantile(gamma1, c(0.10, 0.5, 0.90))
+# gamma.quants = apply(gamma, 2, quantile, c(0.05, 0.5, 0.95))
+# gamma.quants
+# # coef.dat = data.frame(par=paste0('gamma', seq(0,ncol(gamma)-1)), t(gamma.quants))
+# coef.dat = data.frame(par=colnames(gamma.quants), t(gamma.quants))
 
+## beta
 
-ggplot(data=subset(gamma.melt, type %in% c('gamma2'))) +
-  geom_line(aes(x=Var1, y=value), lwd=2) +
-  theme_bw() +
-  theme(text = element_text(size=14)) +
-  facet_grid(Var2~., scales="free_y") +
-  xlab("Iteration")
-ggsave(paste0(path_figures, '/gamma2-trace_', suffix, '.png'))
-
-ggplot(data=subset(gamma.melt, Var2 %in% c('gamma2'))) +
-  geom_density(aes(x=value), lwd=2, fill="dodgerblue", alpha=0.2) +
-  geom_rug(aes(x =value, y = 0), position = position_jitter(height = 0)) +
-  theme_bw() +
-  theme(text = element_text(size=22)) +
-  facet_wrap(Var2~., scales="free_x")
-ggsave(paste0(path_figures, '/gamma2-post-density_', suffix, '.png'))
-
-#quantile(gamma1, c(0.10, 0.5, 0.90))
-gamma.quants = apply(gamma, 2, quantile, c(0.05, 0.5, 0.95))
-gamma.quants
-# coef.dat = data.frame(par=paste0('gamma', seq(0,ncol(gamma)-1)), t(gamma.quants))
-coef.dat = data.frame(par=colnames(gamma.quants), t(gamma.quants))
-
-beta_idx = which(substr(names(post), 1, 5) == "beta")
+beta_idx = which(substr(names(post), 1, 4) == "beta")
 beta_dim = ncol(data.frame(post[beta_idx][[1]]))
 
 beta_names = paste0('beta', seq(0, beta_dim-1))
@@ -201,112 +374,69 @@ beta_names = paste0('beta', seq(0, beta_dim-1))
 beta = matrix(unlist(post[beta_idx]), ncol = beta_dim, byrow = FALSE)
 colnames(beta) = beta_names
 
-beta.quants = apply(beta, 2, quantile, c(0.05, 0.5, 0.95))
-beta.quants
-coef.dat = rbind(coef.dat, data.frame(par=colnames(beta), t(beta.quants)))
-# coef.dat = data.frame(panel=c(1,1, 2, 3, 3), coef.dat)
+beta_melt = melt(beta)
+#beta_melt$type = substr(beta_melt$Var2, 1, 6)
+colnames(beta_melt) = c('iter', 'variable', 'value')#, 'type')
 
-# coef.dat = coef.dat
+ggplot(data=beta_melt) + 
+  geom_histogram(aes(x=value, y = (..count..)/sum(..count..))) + 
+  geom_vline(xintercept=0, lty=2) +
+  facet_wrap(~variable, scales='free_x') +
+  xlab('beta') +
+  ylab('frequency') +
+  theme_bw() #+ 
+#coord_flip()
+ggsave(paste0(path_figures, '/beta_hist_', suffix, '.png'))
 
-coef.dat
-
-# plot gammas and betas
-ggplot(data=coef.dat) +
-  geom_point(aes(y=par, x=X50.)) +
-  geom_linerange(aes(y=par, xmin=X5., xmax=X95.),) +
-  theme_bw() +
-  theme(text = element_text(size=22))
-
-# ggplot(data=coef.dat[c(1,2,4),]) +
-#   geom_point(aes(y=par, x=X50.)) +
-#   geom_linerange(aes(y=par, xmin=X5., xmax=X95.)) +
-#   theme_bw() +
-#   theme(text = element_text(size=22)) +
-#   facet_grid(par~., scales="free")
-
-ggplot(data=coef.dat) +
-  geom_point(aes(y=par, x=X50.)) +
-  geom_linerange(aes(y=par,xmin=X5., xmax=X95.)) +
-  theme_bw() +
-  theme(text = element_text(size=22)) +
-  facet_grid(par~., scales="free")
+ggplot(data=beta_melt) + 
+  geom_line(aes(x = iter, y = value)) + 
+  facet_grid(variable~., scales = "free_y") +
+  xlab('iter') +
+  ylab('value') +
+  theme_bw()
+ggsave(paste0(path_figures, '/beta_trace_', suffix, '.png'))
 
 
-# ggplot(data=coef.dat[c(1,2),]) +
-#   geom_point(aes(y=par, x=X50.), size=2) +
-#   geom_linerange(aes(y=par,xmin=X5., xmax=X95.), lwd=1) +
-#   theme_bw() +
-#   theme(text = element_text(size=22),
-#         axis.text.y=element_blank(),
-#         axis.ticks.y = element_blank()) +
-#   facet_grid(par~., scales="free") + 
-#   ylab('') +
-#   geom_vline(xintercept=0, colour="red", linetype="dashed") #+
-#   #scale_x_continuous(name="Value", limits=c(-0.008, 0)) 
-# ggsave(paste0(path_figures, '/gamma-credible_', suff, '.png'))
+## sigma
 
+sigma_idx = which(substr(names(post), 1, 5) == "sigma")
 
-# ggplot(data=coef.dat[c(3),]) +
-#   geom_point(aes(y=par, x=X50.), size=2) +
-#   geom_linerange(aes(y=par,xmin=X5., xmax=X95.), lwd=1) +
-#   theme_bw() +
-#   theme(text = element_text(size=22),
-#         axis.text.y=element_blank(),
-#         axis.ticks.y = element_blank()) +
-#   facet_grid(par~., scales="free") + 
-#   ylab('') +
-#   geom_vline(xintercept=0, colour="red", linetype="dashed") #+
-# #scale_x_continuous(name="Value", limits=c(-0.008, 0)) 
-# ggsave(paste0(path_figures, '/gamma-credible_', suff, '.png'))
+sigma_dim = rep(NA, length(sigma_idx))
+sigma_names = c()
+for (i in 1:length(sigma_idx)){
+  sigma_dim[i] = ncol(data.frame(post[sigma_idx[i]][[1]] ))
+  sigma_name = names(post[sigma_idx[i]])
+  if (sigma_dim[i] == 1) {
+    sigma_name_rep = sigma_name
+  } else {
+    sigma_name_rep = paste0(sigma_name, '_', seq(1, sigma_dim[i]))
+    #gamma_name_rep = rep(gamma_name, gamma_dim[i])
+    
+  }
+  sigma_names = c(sigma_names, sigma_name_rep)
+}
 
+sigma = matrix(unlist(post[sigma_idx]), ncol = sum(sigma_dim), byrow = FALSE)
+colnames(sigma) = sigma_names
 
-ggplot(data=coef.dat[c(4,5),]) +
-  geom_point(aes(y=par, x=X50.), size=2) +
-  geom_linerange(aes(y=par,xmin=X5., xmax=X95.), lwd=1) +
-  theme_bw() +
-  theme(text = element_text(size=22),
-        axis.text.y=element_blank(),
-        axis.ticks.y = element_blank()) +
-  facet_grid(par~., scales="free") + 
-  ylab('') +
-  geom_vline(xintercept=0, colour="red", linetype="dashed") +
-  scale_x_continuous(name="Value", limits=c(-0.008, 0)) 
-ggsave(paste0(path_figures, '/beta-credible_', suffix, '.png'))
+sigma_melt = melt(sigma)
+#beta_melt$type = substr(beta_melt$Var2, 1, 6)
+colnames(sigma_melt) = c('iter', 'variable', 'value')#, 'type')
 
+ggplot(data=sigma_melt) + 
+  geom_histogram(aes(x=value, y = (..count..)/sum(..count..))) + 
+  #geom_vline(xintercept=0, lty=2) +
+  facet_grid(variable~.) + #, scales='free_x') +
+  xlab('sigma') +
+  ylab('frequency') +
+  theme_bw() #+ 
+#coord_flip()
+ggsave(paste0(path_figures, '/sigma_hist_', suffix, '.png'))
 
-quantile(post$sigma, c(0.10, 0.5, 0.90))
-
-## Antecedent weight w parameters 
-
-w = post$w
-w.quants = apply(w, 2, quantile, c(0.05, 0.5, 0.95))
-w.dat = data.frame(par=paste0('w', seq(0,n_basis)), t(w.quants))
-colnames(w.dat) = c('par', 'q5', 'q50', 'q95')
-
-ggplot(data=w.dat) +
-  geom_point(aes(y=par, x=q50)) +
-  geom_linerange(aes(y=par, xmin=q5, xmax=q95)) +
-  theme_bw() +
-  scale_y_discrete(limits=rev)
-
-vals = seq(0, lag)
-w.dat$vals = vals
-
-ggplot(data=w.dat) + 
-  geom_line(aes(x=vals, y=q50),) +
-  geom_ribbon(aes(x=vals, ymin=q5, ymax=q95), fill='dodgerblue', alpha=0.5) +
-  theme_bw() +
-  theme(text = element_text(size=22)) +
-  ylab("Memory Var \n Antecedent Weight") +
-  scale_x_continuous(name="Lag", breaks=seq(0, 6))
-ggsave(paste0(path_figures, '/antecedent-weights-memory-var_', suffix, '.png'))
-
-
-
-w_mean = colMeans(post$w)
-plot(seq(0, lag), w_mean)
-
-
-hist(post$sigma)
-hist(post$sigma_alpha)
-
+ggplot(data=sigma_melt) + 
+  geom_line(aes(x = iter, y = value)) + 
+  facet_grid(variable~., scales = "free_y") +
+  xlab('iter') +
+  ylab('value') +
+  theme_bw()
+ggsave(paste0(path_figures, '/sigma_trace_', suffix, '.png'))
