@@ -23,8 +23,10 @@ for (site in 1:N_sites){
   year_lower = max(year_lower, min(raw_sub$year, na.rm=TRUE), na.rm=TRUE)
 }
 
+if (include_fire){
 year_upper = min(year_upper, max(fire.raw$year))
 year_lower = max(year_lower, min(fire.raw$year))
+}
 
 if (include_outbreak){
   year_upper = min(year_upper, max(insect$year))
@@ -39,7 +41,9 @@ for (site in 1:N_sites){
  raw[[site]] = raw[[site]][which(raw[[site]]$year %in% years),]
 }
 
-fire.raw = fire.raw[which(fire.raw$year %in% years),]
+if (include_fire){
+ fire.raw = fire.raw[which(fire.raw$year %in% years),]
+}
 if(include_outbreak){
   insect = insect[which(insect$year %in% years),]
 }
@@ -53,11 +57,15 @@ Y = t(matrix(unlist(lapply(raw, function(x) x$chron)), ncol=N_sites, byrow=FALSE
 d = t(matrix(unlist(lapply(raw, function(x) x[,mem_var])), ncol=N_sites, byrow=FALSE))
 
 # binary memory var
-fire.raw = as.matrix(fire.raw$fire)
-fire = as.vector(fire.raw)
+if (include_fire){
+  fire.raw = as.matrix(fire.raw$fire)
+  fire = as.vector(fire.raw)
+}
 
-insect = as.matrix(insect$bool)
-insect = as.vector(insect)
+if (include_outbreak){
+  insect = as.matrix(insect$bool)
+  insect = as.vector(insect)
+}
 
 # if ((include_outbreak == 1) & (include_fire == 0)){
 #   dmem = matrix(insect, ncol=1)
@@ -172,6 +180,10 @@ dat = list(N_years = N_years,
            d_index = d_index,
            include_fire = include_fire,
            include_outbreak = include_outbreak)
+
+if ((include_outbreak==0)&(include_fire==0)){
+
+}
 
 if ((include_outbreak==1)&(include_fire==0)){
   dat$dmem = insect

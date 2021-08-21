@@ -4,8 +4,8 @@
 #######################################################################################
 
 # possible sites
-sites = c('PSME')
-fnames = c("data/three_climate_std_all.csv")
+sites = c('BTP', 'CBS', 'TOW')
+fnames = c("data/BTP-BI.csv", "data/CBS-BI.csv", "data/TOW-BI.csv")
 
 # suffix = 'fire-stream-logy'
 #suffix = 'insect-stream-logy'
@@ -38,14 +38,15 @@ path_figures = 'scripts-stan/three_climate/figures'
 # MODEL: stream
 # continuous memory var
 # currently must have exactly one
-mem_var = 'stream.yel'
+mem_var = 'tmin.may'
 # mem_var = 'ppt.jja'
 lag = 6
 
 # covariates
 # currently must have one or more
+covars = c('pcp.aug', 'pdsi.sep')
 #covars = c('tmax.paug', 'pdsi.poct')
-covars = c('tmax.lsum', 'swe.yel')
+#covars = c('tmax.lsum', 'swe.yel')
 
 include_outbreak = 0
 include_fire     = 0
@@ -62,6 +63,10 @@ fire.raw[which(fire.raw$year %in% c(1664, 1804, 1900)), 'fire'] = 1
 # insect$bool = insect$percent
 # insect$bool[which(insect$percent>60)] = 1
 # insect$bool[which(insect$percent<=60)] = 0
+
+if (!include_outbreak & !include_fire){
+  model_name = 'ecomem_basis_imp_logy_0dmem.stan'
+}
 
 if (xor(include_outbreak, include_fire)){
   model_name = 'ecomem_basis_imp_logy.stan'
