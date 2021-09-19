@@ -311,7 +311,7 @@ ggplot(data=w_dat) +
   theme_bw() +
   theme(text = element_text(size=16)) +
   ylab("Continuous \n Antecedent Weight") +
-  scale_x_continuous(name="Lag", breaks=seq(0, 6))
+  scale_x_continuous(name="Lag", breaks=seq(0, 15))
 ggsave(paste0(path_figures, '/cmem_antecedent-weight-_', suffix, '.png'))
 
 ## gamma
