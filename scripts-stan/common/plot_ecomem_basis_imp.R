@@ -1,6 +1,7 @@
 library(ggplot2)
 library(rstan)
 library(reshape2)
+library(mgcv)
 
 #######################################################################################
 ## spherical decay function
@@ -31,7 +32,7 @@ fit = readRDS(paste0(path_output, '/fit_ecomem_basis_imp_', suffix, '.RDS'))
 plot(fit)
 
 names(fit)
-post = extract(fit)
+post = extract(fit, inc_warmup=TRUE)
 
 names(post)
 
@@ -53,6 +54,10 @@ lag = dat$lag
 if (!dir.exists(path_figures)){
   dir.create(path_figures)
 }
+
+dir.create(paste0(path_figures, '/', suffix))
+path_figures = paste0(path_figures, '/', suffix)
+  
 
 ## discrete memory
 
@@ -84,7 +89,7 @@ if ((include_outbreak==1)&(include_fire==0)){
   ggsave(paste0(path_figures, '/dmem_tau_trace_', suffix, '.png'))
   
   
-  x = seq(1e-6, lag, by=0.1)
+  x = seq(1e-6, 10, by=0.1)
   # mem_d = unlist(lapply(x, function(x){spherical(x, phi_d_mean)}))
   # 
   # plot(x, mem_dmem, xlab="Year", ylab="Antecedent weight")
@@ -124,7 +129,7 @@ if ((include_outbreak==1)&(include_fire==0)){
     theme(text = element_text(size=14)) + 
     # xlab("Lag") +
     ylab("Discrete Antecedent Weight") +
-    scale_x_continuous(name="Lag", breaks=seq(0, 6))
+    scale_x_continuous(name="Lag", breaks=seq(0, 10))
   ggsave(paste0(path_figures, '/dmem_antecedent-weight_', suffix, '.png'))
   
 }
@@ -290,10 +295,12 @@ if ((include_outbreak)&(include_fire)){
 }
 
 ## continuous memory
+w_num = as.character(seq(0,n_basis))
+w_num[which(nchar(w_num)==1)] = paste0('0', w_num[which(nchar(w_num)==1)])
 
 w = post$w
 w_quants = apply(w, 2, quantile, c(0.05, 0.5, 0.95))
-w_dat = data.frame(par=paste0('w', seq(0,n_basis)), t(w_quants))
+w_dat = data.frame(par=paste0('w', w_num), t(w_quants))
 colnames(w_dat) = c('par', 'q5', 'q50', 'q95')
 
 ggplot(data=w_dat) +
@@ -313,6 +320,40 @@ ggplot(data=w_dat) +
   ylab("Continuous \n Antecedent Weight") +
   scale_x_continuous(name="Lag", breaks=seq(0, 15))
 ggsave(paste0(path_figures, '/cmem_antecedent-weight-_', suffix, '.png'))
+
+# fit GAM model
+m <- gam(q50 ~ s(vals, k=4), data = w_dat, method='REML') 
+mlo <- gam(q5 ~ s(vals, k=4), data = w_dat, method='REML') 
+mhi <- gam(q95 ~ s(vals, k=4), data = w_dat, method='REML') 
+
+# define finer grid of predictor values
+lag_fine <- seq(0, lag, by = 0.1) 
+
+# apply predict() function to the fitted GAM model
+# using the finer grid of x values
+p <- predict(m, newdata = data.frame(vals = lag_fine), se = TRUE) 
+plo <- predict(mlo, newdata = data.frame(vals = lag_fine), se = TRUE) 
+phi <- predict(mhi, newdata = data.frame(vals = lag_fine), se = TRUE) 
+
+
+# plot the estimated mean values of y (fit) at given x values
+# over the finer grid of x values;
+# superimpose approximate 95% confidence band for the true 
+# mean values of y at given x values in the finer grid
+w_dat_fine <- data.frame(x = lag_fine, 
+                fit = p$fit,
+                lwr = plo$fit, 
+                upr = phi$fit)
+
+
+ggplot(data=w_dat_fine) + 
+  geom_line(aes(x=x, y=fit),) +
+  geom_ribbon(aes(x=x, ymin=lwr, ymax=upr), fill='dodgerblue', alpha=0.5) +
+  theme_bw() +
+  theme(text = element_text(size=16)) +
+  ylab("Continuous \n Antecedent Weight") +
+  scale_x_continuous(name="Lag", breaks=seq(0, lag))
+ggsave(paste0(path_figures, '/cmem_antecedent-weight-smooth_', suffix, '.png'))
 
 ## gamma
 gamma_idx = which(substr(names(post), 1, 5) == "gamma")
@@ -336,8 +377,9 @@ gamma = matrix(unlist(post[gamma_idx]), ncol = sum(gamma_dim), byrow = FALSE)
 colnames(gamma) = gamma_names
 
 gamma_melt = melt(gamma)
-gamma_melt$type = substr(gamma_melt$Var2, 1, 6)
-colnames(gamma_melt) = c('iter', 'variable', 'value', 'type')
+colnames(gamma_melt) = c('iter', 'variable', 'value')
+# gamma_melt$type = substr(gamma_melt$Var2, 1, 6)
+# colnames(gamma_melt) = c('iter', 'variable', 'value', 'type')
 
 ggplot(data=gamma_melt) + 
   geom_histogram(aes(x=value, y = (..count..)/sum(..count..))) + 
@@ -363,6 +405,8 @@ ggsave(paste0(path_figures, '/gamma_trace_', suffix, '.png'))
 # gamma.quants
 # # coef.dat = data.frame(par=paste0('gamma', seq(0,ncol(gamma)-1)), t(gamma.quants))
 # coef.dat = data.frame(par=colnames(gamma.quants), t(gamma.quants))
+
+
 
 ## beta
 
@@ -396,6 +440,22 @@ ggplot(data=beta_melt) +
   theme_bw()
 ggsave(paste0(path_figures, '/beta_trace_', suffix, '.png'))
 
+
+
+## both gamma and beta
+both_melt = rbind(gamma_melt, beta_melt)
+
+level_order = c('gamma0', 'gamma1', 'beta0', 'beta1')
+
+ggplot(data=both_melt,aes(x=value,y=factor(variable, level=rev(level_order)))) + 
+  stat_summary(fun.data=function(x) {
+    res <- quantile(x,probs=c(0.025,0.5,0.975))
+    names(res)<-c("ymin","y","ymax")
+    res}) + theme_bw() + 
+  geom_vline(xintercept=0, colour="red", linetype="dashed") +
+  xlab("value") + 
+  ylab("variable")
+ggsave(paste0(path_figures, '/gamma_beta_linerange_', suffix, '.png'))
 
 ## sigma
 
@@ -440,3 +500,63 @@ ggplot(data=sigma_melt) +
   ylab('value') +
   theme_bw()
 ggsave(paste0(path_figures, '/sigma_trace_', suffix, '.png'))
+
+## u individual effects
+
+u_idx = which(substr(names(post), 1, 1) == "u")
+
+u_dim = rep(NA, length(u_idx))
+u_names = c()
+for (i in 1:length(u_idx)){
+  u_dim[i] = ncol(data.frame(post[u_idx[i]][[1]] ))
+  u_name = names(post[u_idx[i]])
+  if (u_dim[i] == 1) {
+    u_name_rep = u_name
+  } else {
+    u_name_rep = paste0(u_name, '_', seq(1, u_dim[i]))
+    #gamma_name_rep = rep(gamma_name, gamma_dim[i])
+    
+  }
+  u_names = c(u_names, u_name_rep)
+}
+
+u = matrix(unlist(post[u_idx]), ncol = sum(u_dim), byrow = FALSE)
+colnames(u) = u_names
+
+u_means = colMeans(u)
+hist(u_means)
+
+u_melt = melt(u)
+colnames(u_melt) = c('iter', 'variable', 'value')
+
+N_site_u = length(u_means)/3
+
+# u_melt$site = NA
+# u_melt$site[1:N_site_u] = 1
+# u_melt$site[(N_site_u+1):(2*N_site_u)] = 2
+# u_melt$site[(2*N_site_u+1):(3*N_site_u)] = 3
+# 
+# ggplot(data=u_melt) + 
+#   geom_histogram(aes(x=value, y = (..count..)/sum(..count..))) + 
+#   #geom_vline(xintercept=0, lty=2) +
+#   facet_grid(site~.) + #, scales='free_x') +
+#   xlab('u') +
+#   ylab('frequency') +
+#   theme_bw() #+ 
+# #coord_flip()
+# ggsave(paste0(path_figures, '/sigma_hist_', suffix, '.png'))
+
+u_mean_dat = data.frame(u_means = u_means, site = NA)
+u_mean_dat$site[1:N_site_u] = 1
+u_mean_dat$site[(N_site_u+1):(2*N_site_u)] = 2
+u_mean_dat$site[(2*N_site_u+1):(3*N_site_u)] = 3
+
+ggplot(data=u_mean_dat) +
+  geom_histogram(aes(x=u_means, y = (..count..)/sum(..count..))) +
+  #geom_vline(xintercept=0, lty=2) +
+  facet_grid(site~.) + #, scales='free_x') +
+  xlab('u mean') +
+  ylab('frequency') +
+  theme_bw() #+
+#coord_flip()
+ggsave(paste0(path_figures, '/u_hist_', suffix, '.png'))
