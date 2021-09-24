@@ -256,7 +256,7 @@ saveRDS(dat, paste0(path_output, '/data_ecomem_basis_imp_', suffix, '.RDS'))
 ## compile model and perform sampling
 #######################################################################################
 
-N_iter = 500
+N_iter = 1000
 
 #rstan_options(auto_write = TRUE)
 #options(mc.cores = parallel::detectCores())
