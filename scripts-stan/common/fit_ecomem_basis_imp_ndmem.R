@@ -18,7 +18,7 @@ year_upper = NA
 year_lower = NA
 for (site in 1:N_sites){
   raw_sub = raw[[site]][,c('year', 'chron', mem_var)]
-  raw_sub = raw_sub[apply(raw_sub,1, function(x) all(!is.na(x))),]
+  # raw_sub = raw_sub[apply(raw_sub,1, function(x) all(!is.na(x))),]
   year_upper = min(year_upper, max(raw_sub$year, na.rm=TRUE), na.rm=TRUE)
   year_lower = max(year_lower, min(raw_sub$year, na.rm=TRUE), na.rm=TRUE)
 }
@@ -100,8 +100,9 @@ for (i in 1:N_covars){
     X[,idx.short.na,i] =  rep(mean(X[,,i], na.rm=TRUE), length(idx.short.na))
     d[,idx.short.na]  = rep(mean(d, na.rm=TRUE), length(idx.short.na))
   }
+  X[,,i] = X[,,i] - rowMeans(X[,,i], na.rm=TRUE)
+  d = d - rowMeans(d)
 }
-
 
 
 X_nmiss = length(idx.short.na)
@@ -256,7 +257,11 @@ saveRDS(dat, paste0(path_output, '/data_ecomem_basis_imp_', suffix, '.RDS'))
 ## compile model and perform sampling
 #######################################################################################
 
+<<<<<<< HEAD
 N_iter = 1000
+=======
+N_iter = 20
+>>>>>>> b08fa345f608ef9cb35dd98875fba8e2444bbd64
 
 #rstan_options(auto_write = TRUE)
 #options(mc.cores = parallel::detectCores())
@@ -270,8 +275,11 @@ sm<-stan_model(paste0('scripts-stan/common/', model_name))
 fit<-sampling(sm,
               data=dat,
               iter=N_iter,
+              warmup=10,
               chains = 1, 
-              cores = 1)#,
+              cores = 1,
+              sample_file="test.csv",
+              save_warmup = TRUE)#,
               #init = inits)#,control = list(adapt_delta=0.95))
 
 # save stan fit object for subsequent analysis
