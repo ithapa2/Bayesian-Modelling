@@ -71,7 +71,8 @@ parameters {
 
   // Missings
   //matrix[X_nmiss, N_covars] X_imp[N_sites];
-  vector<lower=0>[X_nmiss] X1_imp[N_sites];
+  //vector<lower=0>[X_nmiss] X1_imp[N_sites];
+  vector[X_nmiss] X1_imp[N_sites];
   vector[X_nmiss] X2_imp[N_sites];
   vector[d_nmiss] d_imp[N_sites];
 } 
